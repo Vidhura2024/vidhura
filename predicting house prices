@@ -105,4 +105,4 @@ print("Scaler saved to 'scaler.pkl'")
 # new_data = np.array([[3, 2000]])  # New data: 3 bedrooms, 2000 square feet
 # new_data_scaled = scaler.transform(new_data)
 # new_prediction = model.predict(new_data_scaled)
-# print(f"Predicted price for new data: {new_prediction[0]}")
+# print(f"Predicted price for new data: {new_prediction[0]}") 
