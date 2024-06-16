@@ -1,0 +1,94 @@
+import pandas as pd
+import numpy as np
+from datetime import datetime
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+
+# Step 1: Data Preprocessing
+def preprocess_data(df):
+    # Convert date columns to datetime
+    df['transaction_date'] = pd.to_datetime(df['transaction_date'])
+    df['customer_signup_date'] = pd.to_datetime(df['customer_signup_date'])
+    
+    # Create additional features
+    df['transaction_month'] = df['transaction_date'].dt.month
+    df['transaction_year'] = df['transaction_date'].dt.year
+    df['days_since_signup'] = (df['transaction_date'] - df['customer_signup_date']).dt.days
+    
+    # Aggregate data to customer level
+    customer_df = df.groupby('customer_id').agg({
+        'transaction_value': 'sum', # Total transaction value
+        'transaction_date': 'count', # Total number of transactions
+        'days_since_signup': 'max' # Recency
+    }).reset_index()
+    
+    customer_df.rename(columns={'transaction_value': 'total_spent', 
+                                'transaction_date': 'transaction_count', 
+                                'days_since_signup': 'recency'}, inplace=True)
+    
+    return customer_df
+
+# Step 2: Feature Engineering
+def create_features(df):
+    # We can use recency, frequency, and monetary value as features
+    df['avg_transaction_value'] = df['total_spent'] / df['transaction_count']
+    df['value_per_day'] = df['total_spent'] / df['recency']
+    return df
+
+# Step 3: Modeling
+def train_model(df):
+    # Prepare feature matrix X and target variable y
+    X = df[['transaction_count', 'recency', 'avg_transaction_value', 'value_per_day']]
+    y = df['total_spent']
+    
+    # Split data into training and testing sets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    
+    # Initialize and train the model
+    model = LinearRegression()
+    model.fit(X_train, y_train)
+    
+    # Predict on the test set
+    y_pred = model.predict(X_test)
+    
+    # Evaluate the model
+    mae = mean_absolute_error(y_test, y_pred)
+    mse = mean_squared_error(y_test, y_pred)
+    rmse = np.sqrt(mse)
+    
+    print(f'Model Performance:\nMAE: {mae}\nMSE: {mse}\nRMSE: {rmse}')
+    
+    return model
+
+# Step 4: Prediction
+def predict_cltv(model, new_data):
+    new_data_preprocessed = preprocess_data(new_data)
+    new_data_features = create_features(new_data_preprocessed)
+    
+    X_new = new_data_features[['transaction_count', 'recency', 'avg_transaction_value', 'value_per_day']]
+    predicted_cltv = model.predict(X_new)
+    
+    new_data_features['predicted_cltv'] = predicted_cltv
+    return new_data_features
+
+# Example usage
+if _name_ == '_main_':
+    # Load your data
+    data = pd.read_csv('customer_transactions.csv')
+    
+    # Preprocess the data
+    preprocessed_data = preprocess_data(data)
+    
+    # Create features
+    feature_data = create_features(preprocessed_data)
+    
+    # Train the model
+    cltv_model = train_model(feature_data)
+    
+    # Predict CLTV for new customers
+    new_customer_data = pd.read_csv('new_customer_transactions.csv')
+    cltv_predictions = predict_cltv(cltv_model, new_customer_data)
+    
+    # Display predictions
+    print(cltv_predictions.head())
